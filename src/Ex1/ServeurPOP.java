@@ -3,9 +3,9 @@ package Ex1;
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.nio.Buffer;
 import java.nio.file.Files;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -13,117 +13,242 @@ import java.util.Map;
 public class ServeurPOP {
     private static final Map<String, String> DESTINATAIRES = new HashMap<>();
     private static final int SOCKET = 8080;
-        static {
-            DESTINATAIRES.put("asterix", "123");
-            DESTINATAIRES.put("obelix", "12");
-        }
-    private static final String COMMANDES =
-            "STAT : avoir obtenir le nombre de mails en attente \n"
-            + "LIST <n>: obtenir les infos sur le message n \n"
-            + "RETR <n> : récupérer le mail séléctionné \n"
-            + "TOP <n> <x> : récupérer les x premières lignes du message n \n"
-            + "DELE <n> : supprimer le mail sélectionné \n"
-            + "RSET : annuler toutes les commandes de suppression de la session \n"
-            + "NOOP : ne rien faire \n"
-            + "QUIT : quitter la session \n";
-    private static final String MESSAGE_CONNEXI0N =
-            "Connectez vous en utilisant les commandes suivants : \n"
-            + "USER <user> : pour choisir votre utilisateur \n"
-            + "PASS <mdp> : pour rentrer votre mot de passe \n";
-    public static void main(String[] args){
 
-        try{
-            ServerSocket socketServeur = new ServerSocket(SOCKET);
-            while(true){
+    static {
+        DESTINATAIRES.put("asterix", "123");
+        DESTINATAIRES.put("obelix", "12");
+        DESTINATAIRES.put("cesar", "123");
+    }
+
+    private static final String COMMANDES =
+            "STAT : obtenir le nombre de mails en attente\n"
+            + "LIST (<n>) : obtenir les infos sur le message n\n"
+            + "RETR <n> : recuperer le mail selectionne\n"
+            + "TOP <n> <x> : recuperer les x premieres lignes du message n\n"
+            + "DELE <n> : supprimer le mail selectionne\n"
+            + "RSET : annuler toutes les commandes de suppression de la session\n"
+            + "NOOP : ne rien faire\n"
+            + "QUIT : quitter la session\n";
+
+    private static final String MESSAGE_CONNEXI0N =
+            "Connectez-vous en utilisant les commandes suivantes :\n"
+            + "USER <user> : pour choisir votre utilisateur\n"
+            + "PASS <mdp> : pour rentrer votre mot de passe\n";
+
+    public static void main(String[] args) {
+        initialiserBoites();
+
+        int port = SOCKET;
+        if (args.length > 0) {
+            try {
+                port = Integer.parseInt(args[0]);
+            } catch (NumberFormatException ignored) {}
+        }
+
+        try {
+            ServerSocket socketServeur = new ServerSocket(port);
+            System.out.println("Serveur POP3 demarre sur le port " + port);
+            while (true) {
                 Socket socketClient = socketServeur.accept();
                 System.out.println("Connexion : " + socketClient.getInetAddress());
 
+                // Correction 1 : demarrage effectif du thread
                 Thread thread = new Thread(() -> gererClient(socketClient));
+                thread.start();
             }
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
 
+    private static void initialiserBoites() {
+        File dossierBoites = new File("boites");
+        if (!dossierBoites.exists()) dossierBoites.mkdirs();
+
+        for (String u : DESTINATAIRES.keySet()) {
+            File b = new File(dossierBoites, u);
+            if (!b.exists()) b.mkdirs();
+        }
+
+        // Fichiers d'exemples pour asterix
+        File mail1 = new File("boites/asterix/1.txt");
+        if (!mail1.exists()) {
+            creerMail(mail1,
+                    "From: cesar@rome.it\r\n" +
+                    "To: asterix@village.ga\r\n" +
+                    "Subject: Treve gauloise\r\n" +
+                    "\r\n" +
+                    "Bonjour Asterix,\r\n" +
+                    "Je propose une treve pour aujourd'hui.\r\n" +
+                    "Ave Cesar !\r\n");
+        }
+
+        File mail2 = new File("boites/asterix/2.txt");
+        if (!mail2.exists()) {
+            creerMail(mail2,
+                    "From: panoramix@village.ga\r\n" +
+                    "To: asterix@village.ga\r\n" +
+                    "Subject: Potion magique prete\r\n" +
+                    "\r\n" +
+                    "Salut Asterix,\r\n" +
+                    "La marmite de potion magique est prete.\r\n" +
+                    "Panoramix.\r\n");
+        }
+    }
+
+    private static void creerMail(File f, String contenu) {
+        try (FileWriter fw = new FileWriter(f)) {
+            fw.write(contenu);
+        } catch (IOException ignored) {}
+    }
+
     private static void gererClient(Socket socketClient) {
-        try{
+        try {
             BufferedReader entree = new BufferedReader(new InputStreamReader(socketClient.getInputStream()));
             PrintWriter sortie = new PrintWriter(socketClient.getOutputStream(), true);
             sortie.println("+OK serveur POP pret");
 
             String user = null;
             Boolean auth = false;
-            File[] mails = null;        // boîte de l'utilisateur (null tant qu'il n'est pas authentifié)
-            boolean[] supprime = null;  // mails marqués par DELE
+            File[] mails = null;        // boite de l'utilisateur (null tant qu'il n'est pas authentifie)
+            boolean[] supprime = null;  // mails marques par DELE
 
             String ligne;
 
-            while ((ligne = entree.readLine()) != null){
+            while ((ligne = entree.readLine()) != null) {
+                ligne = ligne.trim();
+                if (ligne.isEmpty()) continue;
+
                 String[] mots = ligne.split(" ");
-                String commande =  mots[0];
+                String commande = mots[0].toUpperCase();
+
                 if (!auth) {
                     if (commande.equals("USER") && mots.length == 2) {
-                        // on retient juste le nom, la vérification se fait au PASS
-                        user = mots[1];
-                        sortie.println("+OK entrez maintenant votre mot de passe : PASS <mdp>");
+                        // on retient juste le nom, la verification se fait au PASS
+                        user = mots[1].toLowerCase();
+                        if (DESTINATAIRES.containsKey(user)) {
+                            sortie.println("+OK entrez maintenant votre mot de passe : PASS <mdp>");
+                        } else {
+                            user = null;
+                            sortie.println("-ERR utilisateur inconnu");
+                        }
                     } else if (commande.equals("PASS") && mots.length == 2) {
-                        // vérification du couple user / mdp dans le dictionnaire
+                        // verification du couple user / mdp dans le dictionnaire
                         if (user != null && mots[1].equals(DESTINATAIRES.get(user))) {
                             auth = true;
+
+                            // Correction 2 : chargement des fichiers de la boîte de l'utilisateur
+                            File dossierUser = new File("boites/" + user);
+                            if (!dossierUser.exists()) dossierUser.mkdirs();
+                            File[] fichiers = dossierUser.listFiles(File::isFile);
+                            if (fichiers != null) {
+                                Arrays.sort(fichiers, Comparator.comparing(File::getName));
+                                mails = fichiers;
+                            } else {
+                                mails = new File[0];
+                            }
+                            supprime = new boolean[mails.length];
+
                             sortie.println("+OK connecte en tant que " + user);
-                            sortie.println("Vous pouvez utiliser les commandes suivantes : \n" + COMMANDES);
                         } else {
                             // on recommence depuis USER
                             user = null;
                             sortie.println("-ERR utilisateur ou mot de passe incorrect");
                         }
+                    } else if (commande.equals("QUIT")) {
+                        sortie.println("+OK au revoir");
+                        break;
                     } else {
                         sortie.println("-ERR " + MESSAGE_CONNEXI0N);
                     }
-                }
-                else{
-                    sortie.println("Vous pouvez utiliser les commandes suivantes : \n" + COMMANDES);
-
-                    if (commande.equals("STAT")){
+                } else {
+                    if (commande.equals("STAT")) {
                         int nb = 0;
                         long taille = 0;
-                        for (int i = 0; i < mails.length; i++)
-                            if (!supprime[i]) { nb++; taille += mails[i].length(); }
+                        for (int i = 0; i < mails.length; i++) {
+                            if (!supprime[i]) {
+                                nb++;
+                                taille += mails[i].length();
+                            }
+                        }
                         sortie.println("+OK " + nb + " " + taille);
-                    }
-                    else if (commande.equals("LIST") && mots.length == 1){
-                        sortie.println("+OK");
-                        for (int i = 0; i < mails.length; i++)
+                    } else if (commande.equals("LIST") && mots.length == 1) {
+                        int nb = 0;
+                        long taille = 0;
+                        for (int i = 0; i < mails.length; i++) {
+                            if (!supprime[i]) {
+                                nb++;
+                                taille += mails[i].length();
+                            }
+                        }
+                        sortie.println("+OK " + nb + " messages (" + taille + " octets)");
+                        for (int i = 0; i < mails.length; i++) {
                             if (!supprime[i]) sortie.println((i + 1) + " " + mails[i].length());
+                        }
                         sortie.println(".");
-                    }
-                    else if (commande.equals("RSET")){
+                    } else if (commande.equals("RSET")) {
                         Arrays.fill(supprime, false);
                         sortie.println("+OK suppressions annulees");
-                    }
-                    else if (commande.equals("NOOP")){
+                    } else if (commande.equals("NOOP")) {
                         sortie.println("+OK");
-                    }
-                    else {
-                        // commandes avec un numéro de message : LIST n, RETR n, TOP n x, DELE n
+                    } else if (commande.equals("QUIT")) {
+                        // Correction 3 : suppression physique des fichiers marques par DELE
+                        for (int i = 0; i < mails.length; i++) {
+                            if (supprime[i] && mails[i].exists()) {
+                                mails[i].delete();
+                            }
+                        }
+                        sortie.println("+OK au revoir");
+                        break;
+                    } else {
+                        // commandes avec un numero de message : LIST n, RETR n, TOP n x, DELE n
+                        if (mots.length < 2) {
+                            sortie.println("-ERR argument manquant");
+                            continue;
+                        }
 
-                        // le message 1 est la case 0
-                        int n = Integer.parseInt(mots[1]) - 1;
-                        if (supprime[n]) sortie.println("-ERR message " + (n + 1) + " supprime");
-                        else if (commande.equals("LIST")) sortie.println("+OK " + (n + 1) + " " + mails[n].length());
-                        else if (commande.equals("RETR")) envoyer(sortie, mails[n], Integer.MAX_VALUE);
-                        else if (commande.equals("TOP")) envoyer(sortie, mails[n], Integer.parseInt(mots[2]));
-                        else if (commande.equals("DELE")) {
+                        int n;
+                        try {
+                            n = Integer.parseInt(mots[1]) - 1;
+                        } catch (NumberFormatException e) {
+                            sortie.println("-ERR numero de message invalide");
+                            continue;
+                        }
+
+                        if (n < 0 || n >= mails.length) {
+                            sortie.println("-ERR numero de message invalide");
+                        } else if (supprime[n]) {
+                            sortie.println("-ERR message " + (n + 1) + " supprime");
+                        } else if (commande.equals("LIST")) {
+                            sortie.println("+OK " + (n + 1) + " " + mails[n].length());
+                        } else if (commande.equals("RETR")) {
+                            envoyer(sortie, mails[n], Integer.MAX_VALUE);
+                        } else if (commande.equals("TOP")) {
+                            if (mots.length < 3) {
+                                sortie.println("-ERR argument x manquant pour TOP");
+                            } else {
+                                try {
+                                    int x = Integer.parseInt(mots[2]);
+                                    envoyer(sortie, mails[n], x);
+                                } catch (NumberFormatException e) {
+                                    sortie.println("-ERR nombre de lignes invalide");
+                                }
+                            }
+                        } else if (commande.equals("DELE")) {
                             supprime[n] = true;
                             sortie.println("+OK message " + (n + 1) + " marque pour suppression");
+                        } else {
+                            sortie.println("-ERR commande inconnue");
                         }
-                        else sortie.println("-ERR commande inconnue");
                     }
-
                 }
             }
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            System.err.println("Client deconnecte : " + e.getMessage());
+        } finally {
+            try {
+                socketClient.close();
+            } catch (IOException ignored) {}
         }
     }
 
@@ -133,7 +258,7 @@ public class ServeurPOP {
         boolean corps = false;
         for (String l : lignes) {
             if (corps && nbLignes-- <= 0) break;
-            // ligne vide = fin des en-têtes
+            // ligne vide = fin des en-tetes
             if (l.isEmpty()) corps = true;
             sortie.println(l.startsWith(".") ? "." + l : l);
         }

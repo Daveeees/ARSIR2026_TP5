@@ -1,13 +1,19 @@
-//TIP To <b>Run</b> code, press <shortcut actionId="Run"/> or
-// click the <icon src="AllIcons.Actions.Execute"/> icon in the gutter.
-void main() {
-    //TIP Press <shortcut actionId="ShowIntentionActions"/> with your caret at the highlighted text
-    // to see how IntelliJ IDEA suggests fixing it.
-    IO.println(String.format("Hello and welcome!"));
+import Ex1.ServeurPOP;
+import Ex3.ClientIMAP;
 
-    for (int i = 1; i <= 5; i++) {
-        //TIP Press <shortcut actionId="Debug"/> to start debugging your code. We have set one <icon src="AllIcons.Debugger.Db_set_breakpoint"/> breakpoint
-        // for you, but you can always add more by pressing <shortcut actionId="ToggleLineBreakpoint"/>.
-        IO.println("i = " + i);
+public class Main {
+    public static void main(String[] args) {
+        System.out.println("=================================================");
+        System.out.println("   TP n°5 : Protocoles POP et IMAP - Polytech   ");
+        System.out.println("=================================================");
+        System.out.println("Ce projet contient deux exécutables principaux :");
+        System.out.println(" 1. Ex1.ServeurPOP : Serveur POP3 gérant 2 utilisateurs (boîtes et fichiers texte)");
+        System.out.println(" 2. Ex3.ClientIMAP : Client IMAP téléchargeant et supprimant les mails non lus");
+        System.out.println("=================================================");
+        System.out.println("Pour lancer le serveur POP3 :");
+        System.out.println("   java -cp bin Ex1.ServeurPOP [port]");
+        System.out.println("Pour lancer le client IMAP :");
+        System.out.println("   java -cp bin Ex3.ClientIMAP [serveur] [port] [utilisateur] [motdepasse]");
+        System.out.println("=================================================");
     }
 }
