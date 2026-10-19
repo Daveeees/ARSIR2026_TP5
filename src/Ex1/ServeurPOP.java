@@ -3,6 +3,7 @@ package Ex1;
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -52,7 +53,6 @@ public class ServeurPOP {
                 Socket socketClient = socketServeur.accept();
                 System.out.println("Connexion : " + socketClient.getInetAddress());
 
-                // Correction 1 : demarrage effectif du thread
                 Thread thread = new Thread(() -> gererClient(socketClient));
                 thread.start();
             }
@@ -70,7 +70,6 @@ public class ServeurPOP {
             if (!b.exists()) b.mkdirs();
         }
 
-        // Fichiers d'exemples pour asterix
         File mail1 = new File("boites/asterix/1.txt");
         if (!mail1.exists()) {
             creerMail(mail1,
@@ -97,21 +96,21 @@ public class ServeurPOP {
     }
 
     private static void creerMail(File f, String contenu) {
-        try (FileWriter fw = new FileWriter(f)) {
-            fw.write(contenu);
+        try (OutputStreamWriter osw = new OutputStreamWriter(new FileOutputStream(f), StandardCharsets.UTF_8)) {
+            osw.write(contenu);
         } catch (IOException ignored) {}
     }
 
     private static void gererClient(Socket socketClient) {
         try {
-            BufferedReader entree = new BufferedReader(new InputStreamReader(socketClient.getInputStream()));
-            PrintWriter sortie = new PrintWriter(socketClient.getOutputStream(), true);
+            BufferedReader entree = new BufferedReader(new InputStreamReader(socketClient.getInputStream(), StandardCharsets.UTF_8));
+            PrintWriter sortie = new PrintWriter(new OutputStreamWriter(socketClient.getOutputStream(), StandardCharsets.UTF_8), true);
             sortie.println("+OK serveur POP pret");
 
             String user = null;
             Boolean auth = false;
-            File[] mails = null;        // boite de l'utilisateur (null tant qu'il n'est pas authentifie)
-            boolean[] supprime = null;  // mails marques par DELE
+            File[] mails = null;
+            boolean[] supprime = null;
 
             String ligne;
 
@@ -119,12 +118,11 @@ public class ServeurPOP {
                 ligne = ligne.trim();
                 if (ligne.isEmpty()) continue;
 
-                String[] mots = ligne.split(" ");
+                String[] mots = ligne.split("\\s+");
                 String commande = mots[0].toUpperCase();
 
                 if (!auth) {
-                    if (commande.equals("USER") && mots.length == 2) {
-                        // on retient juste le nom, la verification se fait au PASS
+                    if (commande.equals("USER") && mots.length >= 2) {
                         user = mots[1].toLowerCase();
                         if (DESTINATAIRES.containsKey(user)) {
                             sortie.println("+OK entrez maintenant votre mot de passe : PASS <mdp>");
@@ -132,14 +130,15 @@ public class ServeurPOP {
                             user = null;
                             sortie.println("-ERR utilisateur inconnu");
                         }
-                    } else if (commande.equals("PASS") && mots.length == 2) {
-                        // verification du couple user / mdp dans le dictionnaire
+                    } else if (commande.equals("PASS") && mots.length >= 2) {
                         if (user != null && mots[1].equals(DESTINATAIRES.get(user))) {
                             auth = true;
 
-                            // Correction 2 : chargement des fichiers de la boîte de l'utilisateur
                             File dossierUser = new File("boites/" + user);
+                            if (!dossierUser.exists()) dossierUser = new File("boites", user);
+                            if (!dossierUser.exists()) dossierUser = new File("src/Mails/" + Character.toUpperCase(user.charAt(0)) + user.substring(1));
                             if (!dossierUser.exists()) dossierUser.mkdirs();
+
                             File[] fichiers = dossierUser.listFiles(File::isFile);
                             if (fichiers != null) {
                                 Arrays.sort(fichiers, Comparator.comparing(File::getName));
@@ -151,7 +150,6 @@ public class ServeurPOP {
 
                             sortie.println("+OK connecte en tant que " + user);
                         } else {
-                            // on recommence depuis USER
                             user = null;
                             sortie.println("-ERR utilisateur ou mot de passe incorrect");
                         }
@@ -192,7 +190,6 @@ public class ServeurPOP {
                     } else if (commande.equals("NOOP")) {
                         sortie.println("+OK");
                     } else if (commande.equals("QUIT")) {
-                        // Correction 3 : suppression physique des fichiers marques par DELE
                         for (int i = 0; i < mails.length; i++) {
                             if (supprime[i] && mails[i].exists()) {
                                 mails[i].delete();
@@ -201,28 +198,40 @@ public class ServeurPOP {
                         sortie.println("+OK au revoir");
                         break;
                     } else {
-                        // commandes avec un numero de message : LIST n, RETR n, TOP n x, DELE n
                         if (mots.length < 2) {
                             sortie.println("-ERR argument manquant");
                             continue;
                         }
 
-                        int n;
+                        int inputNum;
                         try {
-                            n = Integer.parseInt(mots[1]) - 1;
+                            inputNum = Integer.parseInt(mots[1]);
                         } catch (NumberFormatException e) {
                             sortie.println("-ERR numero de message invalide");
                             continue;
                         }
 
-                        if (n < 0 || n >= mails.length) {
+                        // Accepte a la fois l'indexation 0 (0 = 1er mail) et 1 (1 = 1er mail)
+                        int n;
+                        if (inputNum == 0 && mails.length > 0) {
+                            n = 0;
+                        } else if (inputNum >= 1 && inputNum <= mails.length) {
+                            n = inputNum - 1;
+                        } else {
                             sortie.println("-ERR numero de message invalide");
-                        } else if (supprime[n]) {
+                            continue;
+                        }
+
+                        if (supprime[n]) {
                             sortie.println("-ERR message " + (n + 1) + " supprime");
                         } else if (commande.equals("LIST")) {
                             sortie.println("+OK " + (n + 1) + " " + mails[n].length());
                         } else if (commande.equals("RETR")) {
-                            envoyer(sortie, mails[n], Integer.MAX_VALUE);
+                            try {
+                                envoyer(sortie, mails[n], Integer.MAX_VALUE);
+                            } catch (Exception e) {
+                                sortie.println("-ERR erreur lecture mail : " + e.getMessage());
+                            }
                         } else if (commande.equals("TOP")) {
                             if (mots.length < 3) {
                                 sortie.println("-ERR argument x manquant pour TOP");
@@ -232,6 +241,8 @@ public class ServeurPOP {
                                     envoyer(sortie, mails[n], x);
                                 } catch (NumberFormatException e) {
                                     sortie.println("-ERR nombre de lignes invalide");
+                                } catch (Exception e) {
+                                    sortie.println("-ERR erreur lecture mail : " + e.getMessage());
                                 }
                             }
                         } else if (commande.equals("DELE")) {
@@ -253,12 +264,11 @@ public class ServeurPOP {
     }
 
     private static void envoyer(PrintWriter sortie, File mail, int nbLignes) throws IOException {
-        List<String> lignes = Files.readAllLines(mail.toPath());
+        List<String> lignes = Files.readAllLines(mail.toPath(), StandardCharsets.UTF_8);
         sortie.println("+OK");
         boolean corps = false;
         for (String l : lignes) {
             if (corps && nbLignes-- <= 0) break;
-            // ligne vide = fin des en-tetes
             if (l.isEmpty()) corps = true;
             sortie.println(l.startsWith(".") ? "." + l : l);
         }
