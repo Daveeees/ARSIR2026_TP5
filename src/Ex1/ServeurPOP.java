@@ -52,7 +52,6 @@ public class ServeurPOP {
                 Socket socketClient = socketServeur.accept();
                 System.out.println("Connexion : " + socketClient.getInetAddress());
 
-                // Correction 1 : demarrage effectif du thread
                 Thread thread = new Thread(() -> gererClient(socketClient));
                 thread.start();
             }
@@ -137,7 +136,6 @@ public class ServeurPOP {
                         if (user != null && mots[1].equals(DESTINATAIRES.get(user))) {
                             auth = true;
 
-                            // Correction 2 : chargement des fichiers de la boîte de l'utilisateur
                             File dossierUser = new File("boites/" + user);
                             if (!dossierUser.exists()) dossierUser.mkdirs();
                             File[] fichiers = dossierUser.listFiles(File::isFile);
@@ -192,7 +190,6 @@ public class ServeurPOP {
                     } else if (commande.equals("NOOP")) {
                         sortie.println("+OK");
                     } else if (commande.equals("QUIT")) {
-                        // Correction 3 : suppression physique des fichiers marques par DELE
                         for (int i = 0; i < mails.length; i++) {
                             if (supprime[i] && mails[i].exists()) {
                                 mails[i].delete();
