@@ -36,7 +36,6 @@ public class ServeurPOP {
             + "PASS <mdp> : pour rentrer votre mot de passe\n";
 
     public static void main(String[] args) {
-        initialiserBoites();
 
         int port = SOCKET;
         if (args.length > 0) {
@@ -60,46 +59,6 @@ public class ServeurPOP {
         }
     }
 
-    private static void initialiserBoites() {
-        File dossierBoites = new File("boites");
-        if (!dossierBoites.exists()) dossierBoites.mkdirs();
-
-        for (String u : DESTINATAIRES.keySet()) {
-            File b = new File(dossierBoites, u);
-            if (!b.exists()) b.mkdirs();
-        }
-
-        // Fichiers d'exemples pour asterix
-        File mail1 = new File("boites/asterix/1.txt");
-        if (!mail1.exists()) {
-            creerMail(mail1,
-                    "From: cesar@rome.it\r\n" +
-                    "To: asterix@village.ga\r\n" +
-                    "Subject: Treve gauloise\r\n" +
-                    "\r\n" +
-                    "Bonjour Asterix,\r\n" +
-                    "Je propose une treve pour aujourd'hui.\r\n" +
-                    "Ave Cesar !\r\n");
-        }
-
-        File mail2 = new File("boites/asterix/2.txt");
-        if (!mail2.exists()) {
-            creerMail(mail2,
-                    "From: panoramix@village.ga\r\n" +
-                    "To: asterix@village.ga\r\n" +
-                    "Subject: Potion magique prete\r\n" +
-                    "\r\n" +
-                    "Salut Asterix,\r\n" +
-                    "La marmite de potion magique est prete.\r\n" +
-                    "Panoramix.\r\n");
-        }
-    }
-
-    private static void creerMail(File f, String contenu) {
-        try (FileWriter fw = new FileWriter(f)) {
-            fw.write(contenu);
-        } catch (IOException ignored) {}
-    }
 
     private static void gererClient(Socket socketClient) {
         try {
@@ -206,7 +165,7 @@ public class ServeurPOP {
 
                         int n;
                         try {
-                            n = Integer.parseInt(mots[1]) - 1;
+                            n = Integer.parseInt(mots[1]);
                         } catch (NumberFormatException e) {
                             sortie.println("-ERR numero de message invalide");
                             continue;
