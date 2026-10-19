@@ -1,9 +1,9 @@
 From: panoramix@village.ga
 To: asterix@village.ga
-Subject: Potion magique prête
+Subject: Potion magique prete
 Date: Mon, 19 Oct 2026 08:30:00 +0200
 
 Salut Asterix,
-La marmite de potion magique est pleine.
-N'oublie pas la gourde pour Obélix.
+La marmite de potion magique est prete.
+N'oublie pas la gourde pour Obelix.
 Panoramix.

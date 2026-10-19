@@ -10,88 +10,79 @@
 
 ### Q1. Implémentez un serveur POP capable de traiter les commandes du tableau 1.
 
-Fait ! Le serveur POP3 a été implémenté en Java dans [`src/Ex1/ServeurPOP.java`](src/Ex1/ServeurPOP.java).  
+Le serveur POP3 a été implémenté en Java dans [`src/Ex1/ServeurPOP.java`](src/Ex1/ServeurPOP.java).  
 Il gère deux utilisateurs (`asterix` et `obelix` / `cesar` avec les mots de passe associés), stocke les boîtes dans des dossiers (`boites/asterix/`, `boites/cesar/`) et les mails sous forme de fichiers texte.
 
-![ex1_serveur_pop.png](ex1_serveur_pop.png)
-
-#### Comment tester :
-1. Lancer le serveur POP :
-```bash
-javac -d bin src/Ex1/ServeurPOP.java
-java -cp bin Ex1.ServeurPOP 8080
-```
-
-2. Dans un second terminal, se connecter en telnet :
-```bash
-telnet localhost 8080
-```
+![img.png](img.png)
+![img_1.png](img_1.png)
+![img_3.png](img_3.png)
 
 
 ## EXERCICE 2 : Utilisation d'IMAP
 
-Connexion en telnet au serveur IMAP (Dovecot) :
-```bash
-telnet localhost 143
-1 LOGIN asterix 123
-```
 
 ### Q1.1. Que renvoie la commande SELECT INBOX?
 
-![ex2_select_inbox.png](ex2_select_inbox.png)
+![img_2.png](img_2.png)
 
 ```
 SELECT INBOX ouvre la boîte et renvoie :
-- Le nombre total de messages dans la boîte (* 2 EXISTS).
-- Le nombre de nouveaux messages récents (* 2 RECENT).
-- Le numéro du premier mail non lu (* OK [UNSEEN 1]).
-- La liste des drapeaux supportés (* FLAGS) et modifiables (* OK [PERMANENTFLAGS]).
-- La validité et le prochain identifiant unique (* OK [UIDVALIDITY], [UIDNEXT]).
+- Le nombre total de messages dans la boîte
+- Le nombre de nouveaux messages récents (
+- Le numéro du premier mail non lu 
+- La liste des drapeaux supportés et modifiables 
+- La validité et le prochain identifiant unique.
 - La confirmation que la boîte est ouverte en lecture/écriture (OK [READ-WRITE]).
 ```
 
 ### Q1.2. Déconnectez et reconnectez-vous, puis réutilisez SELECT INBOX. Le résultat a-t-il changé ? Pourquoi ?
 
-![ex2_reconnect.png](ex2_reconnect.png)
+![img_4.png](img_4.png)
 
 ```
-Oui, le nombre de messages récents passe de 2 à 0 (* 0 RECENT).
-Le drapeau Recent est temporaire : il avertit uniquement la première session de l'arrivée de nouveaux messages. Une fois la boîte ouverte une première fois, les messages ne sont plus considérés comme récents pour les sessions suivantes.
-En revanche, le nombre total de messages ne change pas (* 2 EXISTS) et ils restent non lus (* OK [UNSEEN 1]).
+Oui, le nombre de messages récents passe de 3 à 0 (* 0 RECENT).
+Le drapeau Recent est temporaire : il avertit uniquement la première session de l'arrivée de nouveaux messages. 
+Une fois la boîte ouverte une première fois, les messages ne sont plus considérés comme récents pour les sessions suivantes.
+En revanche, le nombre total de messages ne change pas (* 3 EXISTS) et ils restent non lus (* OK [UNSEEN 1]).
 ```
 
-### Q1.3. Le protocole IMAP utilise des drapeaux pour marquer l’état des messages (e.g. Seen, Answered, Deleted, Recent). La commande FETCH 1:* (FLAGS) affiche les drapeaux de tous les messages du dossier courant. Expliquez le rôle et le comportement des drapeaux Seen et Recent.
+### Q1.3. Le protocole IMAP utilise des drapeaux pour marquer l’état des messages (e.g. Seen, Answered, Deleted, Recent).La commande FETCH 1:* (FLAGS) affiche les drapeaux de tous les messages du dossier courant. Expliquez le rôle et le comportement des drapeaux Seen et Recent.
+
+![img_5.png](img_5.png)
 
 ```
 - Seen :
   * Rôle : indique que le message a été lu.
-  * Comportement : drapeau persistant sur le serveur et synchronisé entre tous les clients. Il s'active automatiquement lorsqu'on lit le corps du mail (FETCH BODY[]), ou manuellement via STORE +FLAGS (\Seen).
+  * Comportement : drapeau persistant sur le serveur et synchronisé entre tous les clients. 
+  Il s'active automatiquement lorsqu'on lit le corps du mail (FETCH BODY[]), 
+  ou manuellement via STORE +FLAGS (\Seen).
 
 - Recent :
   * Rôle : indique que le message est nouveau et n'avait jamais été notifié à une session cliente.
-  * Comportement : drapeau temporaire géré automatiquement par le serveur (en lecture seule). Il disparaît dès la fin de la première session qui a ouvert la boîte.
+  * Comportement : drapeau temporaire géré automatiquement par le serveur (en lecture seule). 
+  Il disparaît dès la fin de la première session qui a ouvert la boîte.
 ```
 
 ### Q1.4. À quoi sert le 1:* dans la commande précédente ? Comment récupérer le contenu d’un mail donné et pas uniquement ses drapeaux ?
 
-![ex2_fetch_body.png](ex2_fetch_body.png)
-
 ```
 1. Rôle du 1:* :
-   "1:*" représente l'intervalle allant du premier message (1) au tout dernier (*) présent dans la boîte. Cela permet de cibler l'ensemble des mails sans connaître leur nombre exact.
+   "1:*" représente l'intervalle allant du premier message (1) au tout dernier (*) 
+   présent dans la boîte. Cela permet de cibler l'ensemble des mails sans connaître leur nombre exact.
 
 2. Récupérer le contenu d'un mail :
    On utilise la commande FETCH avec le paramètre BODY[] :
-   4 FETCH 1 BODY[]
-   (Pour lire le mail sans le marquer comme lu, on utilise BODY.PEEK[]).
+   4 FETCH 1 BODY[].
 ```
 
 ### Q1.5. La suppression d’un message en IMAP s’effectue en deux étapes : marquer le message avec le drapeau Deleted via STORE, puis confirmer la suppression avec CLOSE ou LOGOUT. Donnez la séquence de commandes nécessaire pour supprimer le premier mail d’Astérix.
 
-![ex2_delete.png](ex2_delete.png)
-
+![img_6.png](img_6.png)
+![img_7.png](img_7.png)
 ```text
-1 LOGIN asterix 123
+Nous avons appelé notre utilisateur "ex2".
+
+1 LOGIN ex2 123
 2 SELECT INBOX
 3 STORE 1 +FLAGS (\Deleted)
 4 CLOSE
@@ -104,24 +95,15 @@ Explication :
 - Étape 2 : la commande CLOSE valide la suppression définitive et purge physiquement le mail du serveur.
 ```
 
-#### Comment tester l'Exercice 2 :
-```bash
-telnet localhost 143
-```
-
 
 ## EXERCICE 3 : Client IMAP
 
-### Q1. Développez un programme qui, en utilisant le protocole IMAP, se connecte au serveur, affiche sur la sortie standard le contenu de tous les mails non lus d’un utilisateur, puis supprime définitivement ces messages du serveur.
+### Q1. Développez un programme qui, en utilisant le protocole IMAP, se connecte au serveur, affiche sur la sortie standard 
+### le contenu de tous les mails non lus d’un utilisateur, puis supprime définitivement ces messages du serveur.
 
-Fait ! Le client a été développé dans [`src/Ex3/ClientIMAP.java`](src/Ex3/ClientIMAP.java).  
-Il se connecte au serveur (port 143), trouve les mails non lus avec `SEARCH UNSEEN`, affiche leur contenu complet avec `FETCH <id> BODY[]`, puis les supprime définitivement avec `STORE <id> +FLAGS (\Deleted)` et `EXPUNGE`/`CLOSE`.
+Le client a été développé dans [`src/Ex3/ClientIMAP.java`](src/Ex3/ClientIMAP.java).  
+Il se connecte au serveur (port 143), trouve les mails non lus avec `SEARCH UNSEEN`, 
+affiche leur contenu complet avec `FETCH <id> BODY[]`, puis les supprime définitivement avec 
+`STORE <id> +FLAGS (\Deleted)` et `EXPUNGE`/`CLOSE`.
 
-![ex3_client_imap.png](ex3_client_imap.png)
 
-#### Comment tester :
-```bash
-javac -d bin src/Ex3/ClientIMAP.java
-java -cp bin Ex3.ClientIMAP localhost 143 asterix 123
-```
-*(Si des mails non lus sont présents, il les affiche puis les supprime. Si on relance la commande, il confirme qu'il n'y a plus aucun mail non lu).*
